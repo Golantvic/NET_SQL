@@ -1,0 +1,143 @@
+SELECT ('ФИО: Головань Антон');
+-- первый запрос
+SELECT * FROM ratings LIMIT 10;
+
+-- второй запрос
+SELECT userId, COUNT(*) FROM ratings GROUP BY 1 ORDER BY 2 DESC LIMIT 10;
+
+-- Создание таблиц:
+CREATE TABLE Department (
+  id integer,
+  name varchar
+);
+
+INSERT INTO Department VALUES
+('1', 'Therapy'),
+('2', 'Neurology'),
+('3', 'Cardiology'),
+('4', 'Gastroenterology'),
+('5', 'Hematology'),
+('6', 'Oncology');
+
+CREATE TABLE Employee (
+  id integer,
+  department_id integer,
+  chief_doc_id integer,
+  doc_name varchar,
+  num_public integer
+);
+
+INSERT INTO Employee VALUES
+('1', '1', '1', 'Kate', '4'),
+('2', '1', '1', 'Lidia', '2'),
+('3', '1', '1', 'Alexey', '1'),
+('4', '1', '2', 'Pier', '7'),
+('5', '1', '2', 'Aurel', '6'),
+('6', '1', '2', 'Klaudia', '1'),
+('7', '2', '3', 'Klaus', '12'),
+('8', '2', '3', 'Maria', '11'),
+('9', '2', '4', 'Kate', '10'),
+('10', '3', '5', 'Peter', '8'),
+('11', '3', '5', 'Sergey', '9'),
+('12', '3', '6', 'Olga', '12'),
+('13', '3', '6', 'Maria', '14'),
+('14', '4', '7', 'Irina', '2'),
+('15', '4', '7', 'Grit', '10'),
+('16', '4', '7', 'Vanessa', '16'),
+('17', '5', '8', 'Sascha', '21'),
+('18', '5', '8', 'Ben', '22'),
+('19', '6', '9', 'Jessy', '19'),
+('20', '6', '9', 'Ann', '18');
+
+-- Вывести список названий департаментов и количество главных врачей в каждом из этих департаментов
+WITH tmp_table
+AS (
+  SELECT *
+  FROM Department
+  JOIN Employee
+  	ON Department.id = Employee.department_id
+   )
+SELECT name,
+COUNT(DISTINCT chief_doc_id) as number_chief_doc
+FROM tmp_table
+GROUP BY department_id, name;
+
+-- Вывести список департаментов, в которых работают 3 и более сотрудников (id и название департамента, количество сотрудников)
+WITH tmp_table
+AS (
+  SELECT *
+  FROM Department
+  JOIN (SELECT
+        COUNT (DISTINCT id) AS doc_number,
+        department_id
+        FROM Employee
+        GROUP BY department_id) AS tmp_tabl_emp
+  	ON Department.id = tmp_tabl_emp.department_id
+  	)
+SELECT
+    department_id, name,
+    doc_number
+FROM tmp_table
+WHERE doc_number > 2;
+
+-- Вывести список департаментов с максимальным количеством публикаций  (id и название департамента, количество публикаций)
+WITH dep_pub
+AS (
+  SELECT *
+  FROM Department
+  JOIN (SELECT department_id,  SUM(num_public) AS num_publics FROM Employee GROUP BY department_id) AS tmp_table_pub
+  	ON Department.id = tmp_table_pub.department_id
+   )
+SELECT department_id, name, num_publics
+FROM dep_pub
+WHERE num_publics IN
+    (SELECT MAX(num_publics) FROM dep_pub);
+
+-- Вывести список сотрудников с минимальным количеством публикаций в своем департаменте (id и название департамента, имя сотрудника, количество публикаций)
+WITH dep_pub_min
+AS (
+    SELECT *
+    FROM department
+    JOIN (
+        SELECT
+           id,
+           department_id,
+           doc_name,
+           SUM(num_public) AS num_pub
+        FROM employee
+        GROUP BY id, department_id, doc_name
+        ) AS tmp_table_pub_min
+     ON Department.id = tmp_table_pub_min.department_id
+     )
+SELECT
+    department_id, name,
+    doc_name, num_pub
+FROM dep_pub_min
+GROUP BY department_id, name, doc_name, num_pub
+HAVING num_pub IN
+    (SELECT MIN(num_pub) FROM dep_pub_min);
+
+-- Вывести список департаментов и среднее количество публикаций для тех департаментов, в которых работает более одного главного врача (id и название департамента, среднее количество публикаций)
+
+WITH dep_pub_avg
+AS (
+    SELECT *
+    FROM department
+    JOIN (
+        SELECT
+           id,
+           department_id,
+           chief_doc_id,
+           num_public
+        FROM employee
+        GROUP BY id, department_id, chief_doc_id, num_public
+        ) AS tmp_table_pub_avg
+     ON Department.id = tmp_table_pub_avg.department_id
+     )
+SELECT
+    department_id, name,
+    COUNT (DISTINCT chief_doc_id) AS chief_number,
+    CAST (AVG(num_public) AS numeric (5,2)) AS avg_public
+FROM dep_pub_avg
+GROUP BY department_id, name
+HAVING COUNT (DISTINCT chief_doc_id) > 1;
